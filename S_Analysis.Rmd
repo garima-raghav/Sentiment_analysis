@@ -1,0 +1,288 @@
+---
+title: "Sentiment_Analysis"
+author: "Garima Raghav"
+date: "08/04/2021"
+output:
+  slidy_presentation: default
+  powerpoint_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(igraph)
+library(ggplot2)
+library(wordcloud2)
+library(wordcloud)
+library(ggraph)
+library(scales)
+```
+
+## RENAMING & TIDYING UP
+
+Here, I removed the first column that specified the row number and I renamed the columns.
+
+```{r clothes, message = F, warning = F}
+women <- read.csv(file= "/home/khalsa/sentiment Analysis/Womens Clothing E-Commerce Reviews.csv")
+women <- women[-1]
+colnames(women) <- c('ID', 'Age', 'Title', 'Review', 'Rating', 'Recommend', 'Liked', 'Division', 'Dept', 'Class')
+
+```
+
+```{r summary, warning = F}
+str(women)
+unlist(map(map(women, is.na), sum))
+```
+
+The dataset contains 23,486 entries pertaining to the age and review given by the customer and their opinions on the specific clothes purchased. There are columns of either integer or character types. All the integer columns have values and the character columns contain some NAs with Title having the most NAs.
+
+I removed the entries that have no reviews. There were 845 NA reviews so 845/23486 * 100 = 3.6 % ratings are not going to be taken into account. I also combined the title with the review to get all the words into one section, then write down the new tidyup dataset to new csv file
+
+```{r rbinding for tidying up}
+clothesr <- women %>% filter(!is.na(Review))
+notitle <- clothesr %>% filter(is.na(Title)) %>% select(-Title)
+wtitle <- clothesr %>% filter(!is.na(Title)) %>% unite(Review, c(Title, Review), sep = ' ')
+
+main <- bind_rows(notitle, wtitle)
+ unlist(map(map(women, is.na), sum))
+ 
+ write.csv(main, file="/home/khalsa/sentiment Analysis/Tidydata.csv")
+
+```
+
+
+# Stastical Testing
+
+## USING CHI_SQUARED TEST
+
+```{r}
+tidyD <- read.csv(file= "/home/khalsa/sentiment Analysis/Tidydata.csv")
+
+#hypothesis :- Rating and Liked(+ve Feedback) of products must be interrelated
+
+table(tidyD$Rating)
+table(tidyD$Liked)
+table(tidyD$Rating,tidyD$Liked)
+
+#checking statistical independance between rating and liked(+ve feedback) using chi-squared test
+#as we have categorical data
+summary(table(tidyD$Rating,tidyD$Liked)) #less p-value indicates there is no realtion
+#between rating and liking of any product, not compulsurily highly rated product got more likes
+#but practically speaking -> highly rated got more likes compared to others
+
+mean(tidyD$Rating) #true mean
+sd(tidyD$Rating)   #true SD
+
+#NORMALIZING DATA
+scale(tidyD$Rating)
+str(tidyD)
+x <- rnorm(100, mean = 4, sd=1)
+x
+t.test(x, mu= 4, conf.level = 0.99) # p-value>0.05 indicating acceptance of null hypothesis
+#confidence level for median
+wilcox.test(x, conf.int = T) #rejecting null hypothesis
+
+
+#ACC. to hypothesis let mean=4 with confidence of 80%
+t.test(tidyD$Rating, mu= 4, conf.level = 0.80)#smaller p value indicated rejection of hypothesis
+#indicating mean is <4 or >4
+
+#confidence level for median
+wilcox.test(tidyD$Rating, conf.int = T) #rejecting null hypothesis
+
+#Testing for NORMALITY
+shapiro.test(x) #normally distributed
+
+
+#checking for correlation between Rating and Id of product
+#as our data is normally distributed we will use "PEARSON METHOD"
+
+cor(tidyD$Rating, tidyD$ID)
+cor.test(tidyD$Rating, tidyD$ID)# significant correlation doesn't exists
+#that means a product with same ID must have got different ratings by different customers
+#of different age group
+
+
+#even the correlation between Customer Age and Product Id doesn't exist indicating
+#Different choice for one particular age group
+cor(tidyD$Age, tidyD$ID)
+cor.test(tidyD$Age, tidyD$ID)
+
+```
+
+
+# Descriptive examination and Sentiment Analysis
+
+## Top-20 Clothing ID
+
+To understand the distribution..
+firstly look at the sale of top products.
+
+```{r}
+REVIEWS = main %>%
+  group_by(`ID`) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  ungroup() %>%
+  mutate(clothid = reorder(`ID`,Count)) %>%
+  head(20)
+
+REVIEWS %>%
+  ggplot(aes(x = clothid, y = Count)) +
+  geom_bar(stat='identity',colour="white", fill = "orange") +
+  geom_text(aes(x = clothid, y = 1, label = paste0("(",Count,")",sep="")),
+            hjust=0, vjust=.5, size = 4, colour = 'black',
+            fontface = 'bold') +
+  labs(x = 'ID of Cloth', 
+       y = 'Count', 
+       title = 'Sales of Top 20 products') +
+  coord_flip() +
+  theme_bw()
+```
+
+Now look at Rating distribution of top products.
+
+```{r}
+top20<- main%>%
+  group_by(ID)%>%
+  add_count()%>%
+  filter(n>245)
+
+top20$Rating<- as.factor(top20$Rating)
+
+top20%>%
+  group_by(ID)%>%
+  mutate(pct = n/sum(n))%>%
+  ungroup()%>%
+  mutate(ClothingID = reorder(ID, n))%>%
+  ggplot(aes(ClothingID, pct, fill = Rating))+
+  geom_col()+
+  scale_fill_brewer(palette="Spectral")+
+  coord_flip()+
+  scale_y_continuous(labels = percent)+
+labs(title = "Rating Distribution for Top 20 Products")
+```
+
+**There seems to be little correlation between how much sales a product has and the distribution of ratings given to it.**
+
+
+I'd like to see which Department gets however much percentage of the reviews/ratings.
+
+```{r Dept distribution, message = F, warning = F}
+ggplot(data.frame(prop.table(table(main$Dept))), aes(x=Var1, y = Freq*100)) + geom_bar(stat = 'identity') + xlab('Department Name') + ylab('Percentage of Reviews/Ratings (%)') + geom_text(aes(label=round(Freq*100,2)), vjust=-0.25) + ggtitle('Percentage of Reviews/Ratings By Department')
+```
+
+**Tops have the highest percentage of reviews and ratings in this dataset**, followed by dresses. Items in the Jackets and Trend department received the fewest reviews. 
+
+
+## Ratings by Department
+I will be excluding 'Trend' as it contains a mix of clothes that can fit in the other categories of Dept. They also represent 119/23486 = 0.51% of the dataset so I don't expect a large effect on the data analysis. I will focus on 5 departments: Bottoms, Dresses, Intimate, Jackets, and Tops. Now, most of the reviews/ratings are for Tops and the least, for Jackets.
+
+Let's look at the distribution of ratings within each department. 
+
+```{r bydept, message = F, warning = F}
+#ratings percentage by Department
+phisto <- main %>% filter(!is.na(Dept), Dept != 'Trend') %>% mutate(Dept = factor(Dept)) %>% group_by(Dept) %>% count(Rating) %>% mutate(perc = n/sum(n))
+phisto %>% ggplot(aes(x=Rating, y = perc*100, fill = Dept)) + geom_bar(stat = 'identity', show.legend = FALSE) + facet_wrap(~Dept) + ylab('Percentage of reviews (%)') + geom_text(aes(label=round(perc*100,2)))
+```
+
+In each Department, the dominant rating given is 5-stars. **Jacket has the highest number of 5-star ratings within its department**. The Jacket department also had to fewest number of reviews which could mean that if the number of ratings/reviews were to increase, there may not be as big of a gap between 5-star and other-star reviews. As far as I can tell, jackets may be a good investment as consumers seem to give more 5-star reviews.
+
+## Recommendation By Age
+
+```{r}
+main<- main%>%
+  mutate(Age = 10 * (Age%/%10), Rating)
+main$Age<- as.factor(main$Age)
+main$Rating<- as.factor(main$Rating)
+
+main%>%
+  group_by(Age)%>%
+  summarize(n = n())%>%
+  ggplot(aes(Age, n))+
+  geom_col(fill = "palegreen4")+
+labs(title = "Number of Reviews by Users Lumped by Decade of Age")
+```
+
+
+Insight:
+Age is normally distributed, and slightly skewed right. With the majority of users aged between 30-50.
+
+
+## tokenization: analysing Reviews
+
+To tokenize the words, I used the TidyText package which allows me to filter out the stop words (and, I, us, ect). I want to tokenize Review
+
+sorting out the stop words and removed any digits. 
+
+```{r bigramming function, echo=F}
+bigramming <- function(data){
+  cbigram <- data %>% unnest_tokens(bigram, Review, token = 'ngrams', n = 2)
+  cbigram_sep <- cbigram %>% separate(bigram, c('first', 'second'), sep = ' ')
+  cbigram2 <- cbigram_sep %>% filter(!first %in% stop_words$word, !second %in% stop_words$word, !str_detect(first,      '\\d'), !str_detect(second, '\\d')) %>% unite(bigram, c(first, second), sep = ' ') 
+  return(cbigram2)
+}
+```
+
+I grouped the words according to their Ratings and plotted the 10 most common bigrams for each rating. 
+
+```{r bigram}
+top_bigrams <- bigramming(main) %>% mutate(Rating = factor(Rating, levels <- c(5:1))) %>% mutate(bigram = factor(bigram, levels = rev(unique(bigram)))) %>% group_by(Rating) %>% count(bigram, sort=TRUE) %>% top_n(10, n) %>% ungroup() 
+
+top_bigrams  %>% ggplot(aes(bigram, n, fill = Rating)) + geom_col(show.legend = FALSE) + facet_wrap(~Rating, ncol = 3, scales = 'free') + labs(x=NULL, y = 'frequency') + ggtitle('Most Common Bigrams (By Ratings)') + coord_flip()
+```
+
+It goes without saying that there are positive phrases for the higher ratings and negative phrases for the lower ratings. 'Love love' is the most mentioned bigram. The phrase 'arm holes' show up in 2,3-star reviews, which could refer to a lack of fit.
+
+
+
+MOST USED WORDS:-
+
+```{r}
+main %>% 
+  unnest_tokens(word, `Review`) %>% 
+  anti_join(stop_words) %>% 
+  count(word, sort = TRUE) %>%
+  head(10) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col() +
+  labs(x = NULL, title = "Most used words in Reviews") +
+  coord_flip()
+```
+
+Insight:More clarity is given as to why a word is related to a Rating
+
+
+## checking for corelation of sentiments with ratings
+
+```{r}
+main_bigrams <- main%>%
+  na.omit()%>%
+  unnest_tokens(bigram, Review, token = "ngrams", n = 1)
+
+bing<- get_sentiments("bing")
+
+names(main_bigrams)[names(main_bigrams) == "bigram"] <- "word"
+
+sentiment <- main_bigrams%>%
+  inner_join(bing)
+
+sentiment%>%
+  group_by(Rating, sentiment)%>%
+  summarize(n = n())%>%
+  mutate(pct = n/sum(n))%>%
+  ggplot(aes(Rating, pct, fill= sentiment))+
+  geom_col()+
+  scale_fill_brewer(palette="Spectral")+
+  scale_y_continuous(labels = percent)+
+labs(title = "Using the Bing Lexicon")
+```
+
+
+Insight:
+sentiment seems to be correlated with Rating
+

@@ -6,8 +6,8 @@ table(tidyD$Rating)
 table(tidyD$Liked)
 table(tidyD$Rating,tidyD$Liked)
 
-#checking independance between rating and liked(+ve feedback) using chi-squared test
-
+#checking statistical independance between rating and liked(+ve feedback) using chi-squared test
+#as we have categorical data
 summary(table(tidyD$Rating,tidyD$Liked)) #less p-value indicates there is no realtion
 #between rating and liking of any product, not compulsurily highly rated product got more likes
 #but practically speaking -> highly rated got more likes compared to others

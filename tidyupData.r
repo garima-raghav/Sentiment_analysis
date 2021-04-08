@@ -21,26 +21,4 @@ wtitle <- clothesr %>% filter(!is.na(Title)) %>% unite(Review, c(Title, Review),
 #reducing column by merging title and review
 main <- bind_rows(notitle, wtitle)  #22641 obs. of 9 variables
 
-#Top-ten Clothing ID
-
-REVIEWS = main %>%
-  group_by(`Clothing ID`) %>%
-  summarise(Count = n()) %>%
-  arrange(desc(Count)) %>%
-  ungroup() %>%
-  mutate(clothid = reorder(`Clothing ID`,Count)) %>%
-  head(10)
-  
- REVIEWS %>%
-  ggplot(aes(x = clothid, y = Count)) +
-  geom_bar(stat='identity',colour="white", fill = "orange") +
-  geom_text(aes(x = clothid, y = 1, label = paste0("(",Count,")",sep="")),
-            hjust=0, vjust=.5, size = 4, colour = 'black',
-            fontface = 'bold') +
-  labs(x = 'ID of Cloth', 
-       y = 'Count', 
-       title = 'Clothing ID and Count') +
-  coord_flip() +
-  theme_bw()
- 
  write.csv(main, file="/home/khalsa/sentiment Analysis/Tidydata.csv")
