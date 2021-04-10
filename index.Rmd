@@ -3,8 +3,9 @@ title: "Sentiment_Analysis"
 author: "Garima Raghav"
 date: "08/04/2021"
 output:
-  slidy_presentation: default
+  beamer_presentation: default
   powerpoint_presentation: default
+  slidy_presentation: default
 ---
 
 ```{r setup, include=FALSE}
@@ -15,11 +16,20 @@ library(tidytext)
 library(stringr)
 library(igraph)
 library(ggplot2)
-library(wordcloud2)
+library(reshape2)
 library(wordcloud)
+library(data.table)
+library(lattice)
 library(ggraph)
 library(scales)
 ```
+
+# INTRODUCTION
+
+I have done the sentiment analysis for **Women's Clothing E-Commersce Reviews**.
+This dataset contains more than 23,000 online reviews of women’s clothing from various retailers.
+The Data i have  collected from online mode.
+
 
 ## RENAMING & TIDYING UP
 
@@ -212,6 +222,17 @@ Insight:
 Age is normally distributed, and slightly skewed right. With the majority of users aged between 30-50.
 
 
+## Ratings in dependency of other variables: Lattice graphs
+
+Lattice graphs can show easly possible relations between the variables.
+
+```{r}
+xyplot(factor(Rating) ~ Age|factor(`Division`), groups = factor(`Recommend`),
+        data = main)
+```
+
+Insight:graoh shows with its colouring from red to blue that lower ratings are more likely to not being recommended.It seems that with growing age the rating and the recommendation behaviour gets more strict.
+
 ## tokenization: analysing Reviews
 
 To tokenize the words, I used the TidyText package which allows me to filter out the stop words (and, I, us, ect). I want to tokenize Review
@@ -236,6 +257,28 @@ top_bigrams  %>% ggplot(aes(bigram, n, fill = Rating)) + geom_col(show.legend = 
 ```
 
 It goes without saying that there are positive phrases for the higher ratings and negative phrases for the lower ratings. 'Love love' is the most mentioned bigram. The phrase 'arm holes' show up in 2,3-star reviews, which could refer to a lack of fit.
+
+## WORDCLOUDS
+
+```{r}
+rate.cols <- c("#d7191c", "#fdae61", "#fc8d59", "#a6d96a", "#1a9641")
+by.rating <- as.data.table(main %>% 
+  unnest_tokens(bigram, `Review`, token = "ngrams", n = 2) %>% 
+  separate(bigram, c("word1", "word2"), sep = " ") %>% 
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>% 
+  unite(bigram.unite, word1, word2, sep = " ", remove = FALSE) %>% 
+  count(bigram.unite, Rating, sort = TRUE))
+
+by.pct <- by.rating[, gr.pct := n/sum(n), by = Rating]
+
+by.rating %>% 
+  group_by(Rating) %>% 
+  top_n(n = 40, wt = gr.pct) %>% 
+  acast(bigram.unite ~ Rating, value.var = "gr.pct", fill = 0) %>%
+  comparison.cloud(title.size = 1, random.order = TRUE,
+                   colors = rate.cols)
+```
 
 
 
@@ -286,3 +329,12 @@ labs(title = "Using the Bing Lexicon")
 Insight:
 sentiment seems to be correlated with Rating
 
+
+## Conclusion
+The key takeaways from the above analysis of this dataset are:
+
+-> 5-star reviews are dominant in each department with jackets having the highest proportion within its department
+
+-> Customers in their 30’s and 40’s leave the most reviews.
+
+-> Tops have the highest percentage of reviews and ratings in this dataset followed by dresses
