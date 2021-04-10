@@ -1,10 +1,7 @@
 ---
 title: "Sentiment_Analysis"
 author: "Garima Raghav"
-date: "08/04/2021"
 output:
-  beamer_presentation: default
-  powerpoint_presentation: default
   slidy_presentation: default
 ---
 
@@ -26,12 +23,15 @@ library(scales)
 
 # INTRODUCTION
 
-I have done the sentiment analysis for **Women's Clothing E-Commersce Reviews**.
+I have done the sentiment analysis and some Descriptive Examination for **Women's Clothing E-Commersce Reviews**.
 This dataset contains more than 23,000 online reviews of women’s clothing from various retailers.
-The Data i have  collected from online mode.
+
+Sentiment Analysis also known as opinion mining, is the process of determining the emotional tone behind a series of words,used to gain an understanding of opinions and emotions.
+
+It helps Data Analysts within large enterprise gauge public opinion , conduct market research and understand customer experiences.
 
 
-## RENAMING & TIDYING UP
+# RENAMING & TIDYING UP
 
 Here, I removed the first column that specified the row number and I renamed the columns.
 
@@ -57,7 +57,7 @@ notitle <- clothesr %>% filter(is.na(Title)) %>% select(-Title)
 wtitle <- clothesr %>% filter(!is.na(Title)) %>% unite(Review, c(Title, Review), sep = ' ')
 
 main <- bind_rows(notitle, wtitle)
- unlist(map(map(women, is.na), sum))
+ unlist(map(map(main, is.na), sum))
  
  write.csv(main, file="/home/khalsa/sentiment Analysis/Tidydata.csv")
 
@@ -330,7 +330,7 @@ Insight:
 sentiment seems to be correlated with Rating
 
 
-## Conclusion
+# Conclusion
 The key takeaways from the above analysis of this dataset are:
 
 -> 5-star reviews are dominant in each department with jackets having the highest proportion within its department
@@ -338,3 +338,9 @@ The key takeaways from the above analysis of this dataset are:
 -> Customers in their 30’s and 40’s leave the most reviews.
 
 -> Tops have the highest percentage of reviews and ratings in this dataset followed by dresses
+
+-> we can also conclude from above analysis that high ratings doesn't lead to more number of reviews more often
+
+-> Sentiments are co-related with Ratings, the product with high ratings got more +ve reviews and recommendation
+
+
